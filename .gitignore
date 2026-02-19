@@ -1,0 +1,40 @@
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~
+
+# Claude project context and development notes
+.claude/
+.claude_dev/
+
+# OpenShift inventory collection (reference only)
+openshift-rhcl/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
+*.log
+
+# Helmfile state directories
+helmfile.yaml-*/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+*.egg-info/
+
+# Build artifacts
+*.tar.gz
+*.zip
+dist/
+build/

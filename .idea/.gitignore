@@ -1,0 +1,17 @@
+# Default ignored files
+/shelf/
+/workspace.xml
+# Editor-based HTTP Client requests
+/httpRequests/
+# Datasource local storage ignored files
+/dataSources/
+/dataSources.local.xml
+# Additional sensitive files that may contain secrets
+/httpRequests/http-client.private.env.json
+*.iml.key
+*.key
+*.pem
+*.p12
+*.pfx
+# Run configurations may contain environment variables with secrets
+/runConfigurations/*.xml

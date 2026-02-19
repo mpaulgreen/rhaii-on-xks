@@ -1,0 +1,109 @@
+{{- if .Values.operators.kuadrant.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kuadrant-operator-controller-manager
+  namespace: {{ .Values.namespaces.operators }}
+  labels:
+    app: kuadrant
+    control-plane: controller-manager
+    app.kubernetes.io/name: kuadrant-operator
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: rhcl
+spec:
+  replicas: {{ .Values.operators.kuadrant.replicas }}
+  selector:
+    matchLabels:
+      app: kuadrant
+      control-plane: controller-manager
+  template:
+    metadata:
+      labels:
+        app: kuadrant
+        control-plane: controller-manager
+        app.kubernetes.io/name: kuadrant-operator
+        app.kubernetes.io/component: operator
+        app.kubernetes.io/part-of: rhcl
+    spec:
+      serviceAccountName: kuadrant-operator-controller-manager
+      {{- with .Values.operators.kuadrant.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.operators.kuadrant.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.operators.kuadrant.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        {{- if .Values.operators.kuadrant.podSecurityContext }}
+        {{- toYaml .Values.operators.kuadrant.podSecurityContext | nindent 8 }}
+        {{- else }}
+        seccompProfile:
+          type: RuntimeDefault
+        {{- end }}
+      containers:
+      - name: manager
+        image: {{ .Values.images.registry }}/{{ .Values.images.operators.kuadrant.repository }}@{{ .Values.images.operators.kuadrant.digest }}
+        imagePullPolicy: {{ .Values.images.pullPolicy }}
+        command:
+        - /manager
+        args:
+        - --leader-elect
+        env:
+        - name: EXTENSIONS_DIR
+          value: /extensions
+        - name: RELATED_IMAGE_WASMSHIM
+          value: {{ .Values.images.registry }}/{{ .Values.images.components.wasmshim.repository }}@{{ .Values.images.components.wasmshim.digest }}
+        - name: OPERATOR_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        {{- if eq .Values.platform.type "openshift" }}
+        - name: ISTIO_GATEWAY_CONTROLLER_NAMES
+          value: openshift.io/gateway-controller/v1
+        {{- end }}
+        {{- with .Values.operators.kuadrant.env }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        ports:
+        - name: metrics
+          containerPort: 8080
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+            scheme: HTTP
+          initialDelaySeconds: 15
+          periodSeconds: 20
+          timeoutSeconds: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 1
+          failureThreshold: 3
+        resources:
+          {{- toYaml .Values.operators.kuadrant.resources | nindent 10 }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        volumeMounts:
+        - name: extensions-socket-volume
+          mountPath: /tmp/kuadrant
+      volumes:
+      - name: extensions-socket-volume
+        emptyDir: {}
+{{- end }}

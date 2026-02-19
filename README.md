@@ -17,6 +17,7 @@ Infrastructure Helm charts for deploying Red Hat AI Inference Server (KServe LLM
 | cert-manager-operator | 1.15.2 | TLS certificate management |
 | sail-operator (Istio) | 3.2.x | Gateway API for inference routing |
 | lws-operator | 1.0 | LeaderWorkerSet controller for multi-node workloads |
+| rhcl (optional) | 1.2.0 | API gateway, authentication, rate limiting (Kuadrant) |
 | kserve | 3.4.0-ea.1 | KServe controller for LLMInferenceService lifecycle |
 
 ### Version Compatibility
@@ -27,6 +28,7 @@ Infrastructure Helm charts for deploying Red Hat AI Inference Server (KServe LLM
 | Istio | v1.27.x | Service mesh |
 | InferencePool API | v1 | `inference.networking.k8s.io/v1` |
 | KServe | rhoai-3.4+ | LLMInferenceService controller |
+| RHCL (Kuadrant) | 1.2.0 | AuthPolicy, RateLimitPolicy, DNSPolicy, TLSPolicy |
 
 ## Prerequisites
 
@@ -116,16 +118,46 @@ For deploying LLM inference services, GPU requirements, and testing inference, s
 
 ---
 
+## Optional Components
+
+### RHCL (Red Hat Connectivity Link)
+
+RHCL provides enterprise API gateway features for your inference services:
+
+- **Authentication** (API keys, OIDC, mTLS) via AuthPolicy
+- **Rate Limiting** (per-user, per-tenant) via RateLimitPolicy
+- **DNS Management** (multi-cluster routing) via DNSPolicy
+- **TLS Policies** (cert-manager integration) via TLSPolicy
+
+**Prerequisites:** cert-manager and sail-operator must be deployed first.
+
+**Deploy:**
+```bash
+make deploy-rhcl
+```
+
+**Documentation:** See [charts/rhcl/README.md](charts/rhcl/README.md) for detailed RHCL documentation.
+
+**Use Cases:**
+- Protect inference endpoints with API key authentication
+- Rate-limit inference requests per user/tenant
+- Multi-cluster geo-routing for HA deployments
+- Automated TLS certificate management
+
+---
+
 ## Usage
 
 ```bash
 # Deploy
 make deploy              # cert-manager + istio + lws
 make deploy-all          # cert-manager + istio + lws + kserve
+make deploy-rhcl         # Deploy RHCL (optional - API gateway features)
 make deploy-kserve       # Deploy KServe
 
 # Undeploy
 make undeploy            # Remove all infrastructure
+make undeploy-rhcl       # Remove RHCL
 make undeploy-kserve     # Remove KServe
 
 # Test (ODH conformance)
@@ -157,6 +189,13 @@ sailOperator:
 
 lwsOperator:
   enabled: true   # Required for multi-node LLM workloads
+
+# rhcl (optional - for API gateway, auth, rate limiting)
+rhclOperator:
+  enabled: true   # Enabled by default - set to false if not needed
+  operators:
+    dns:
+      enabled: false  # Diasbled by default - requires cloud DNS credentials for full functionality
 ```
 
 ---

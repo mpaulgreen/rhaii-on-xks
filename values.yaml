@@ -27,6 +27,20 @@ sailOperator:
 lwsOperator:
   enabled: true
 
+# rhcl (Red Hat Connectivity Link) - optional API gateway, auth, rate limiting
+rhclOperator:
+  enabled: true  # Enabled by default - set to false if not needed (optional component)
+  # RHCL-specific configuration (passed to charts/rhcl/values.yaml)
+  # NOTE: This setting overrides charts/rhcl/values.yaml operators.dns.enabled when using helmfile
+  operators:
+    dns:
+      # DNS operator deployment control
+      # - Set to true here AND in charts/rhcl/values.yaml for full deployment
+      # - This root setting takes precedence when deploying via make deploy-all
+      # - Requires Azure/AWS/GCP DNS credentials for full functionality
+      # - Basic operator validation works without credentials (pods will start)
+      enabled: false
+
 # =============================================================================
 # KServe
 # =============================================================================

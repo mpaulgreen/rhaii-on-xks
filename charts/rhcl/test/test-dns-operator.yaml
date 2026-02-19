@@ -1,0 +1,354 @@
+---
+# DNS Operator Validation Test Manifest
+#
+# Purpose: Validate DNS operator deployment and basic reconciliation
+# Note: DNS operator does NOT create separate operand deployments
+#       The DNS operator pod itself manages DNS records with cloud providers
+#
+# Prerequisites:
+# 1. RHCL deployed with DNS operator enabled (operators.dns.enabled: true)
+# 2. Gateway deployed with external IP/hostname
+# 3. Optional: Cloud provider credentials (AWS/Azure/GCP) for full DNS integration
+#
+# To deploy:
+#   kubectl apply -f test-dns-operator.yaml
+#
+# To cleanup:
+#   kubectl delete -f test-dns-operator.yaml
+#   OR
+#   kubectl delete ns dns-test
+#
+---
+# Test namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dns-test
+  labels:
+    app.kubernetes.io/part-of: rhcl-dns-test
+
+---
+# ServiceAccount for test gateway
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dns-test-gateway-istio
+  namespace: dns-test
+imagePullSecrets:
+- name: redhat-pull-secret
+
+---
+# Copy pull secret from kuadrant-system (handled by test script)
+# kubectl get secret redhat-pull-secret -n kuadrant-system -o yaml | \
+#   sed 's/namespace: kuadrant-system/namespace: dns-test/' | \
+#   kubectl apply -f -
+
+---
+# Simple echo service for DNS testing
+apiVersion: v1
+kind: Service
+metadata:
+  name: echo
+  namespace: dns-test
+spec:
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  selector:
+    app: echo
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: echo
+  namespace: dns-test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: echo
+  template:
+    metadata:
+      labels:
+        app: echo
+    spec:
+      containers:
+      - name: echo
+        image: ealen/echo-server:latest
+        ports:
+        - containerPort: 8080
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+
+---
+# Gateway for DNS testing
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: dns-test-gateway
+  namespace: dns-test
+  labels:
+    app.kubernetes.io/part-of: rhcl-dns-test
+spec:
+  gatewayClassName: istio
+  listeners:
+  - name: http
+    protocol: HTTP
+    port: 80
+    allowedRoutes:
+      namespaces:
+        from: Same
+
+---
+# HTTPRoute to echo service
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: echo-route
+  namespace: dns-test
+spec:
+  parentRefs:
+  - name: dns-test-gateway
+  hostnames:
+  - "echo.dns-test.example.com"
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: echo
+      port: 8080
+
+---
+# Mock DNS provider secret
+# In production, this would contain real AWS/Azure/GCP credentials
+# For testing without credentials, the DNS operator will handle this gracefully
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dns-provider-credentials-mock
+  namespace: dns-test
+type: Opaque
+stringData:
+  # Mock credentials - DNS operator will attempt to use these
+  # Without valid credentials, DNSRecord will stay in error state
+  # This is expected behavior for testing without cloud provider access
+  AWS_ACCESS_KEY_ID: "mock-access-key"
+  AWS_SECRET_ACCESS_KEY: "mock-secret-key"
+  # For Azure:
+  # AZURE_TENANT_ID: "mock-tenant"
+  # AZURE_CLIENT_ID: "mock-client"
+  # AZURE_CLIENT_SECRET: "mock-secret"
+  # AZURE_SUBSCRIPTION_ID: "mock-subscription"
+  # For GCP:
+  # GCP_SERVICE_ACCOUNT_KEY: "{\"type\":\"service_account\"...}"
+
+---
+# DNSPolicy - Configures DNS load balancing for the Gateway
+# This is a v1 resource (not v1alpha1 like DNSRecord)
+apiVersion: kuadrant.io/v1
+kind: DNSPolicy
+metadata:
+  name: dns-test-policy
+  namespace: dns-test
+spec:
+  # Target the Gateway
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: dns-test-gateway
+
+  # Load balancing configuration
+  loadBalancing:
+    geo: us-east-1           # Geographic routing
+    weight: 100              # Traffic weight
+    defaultGeo: true         # Use as catch-all
+
+  # Health check configuration
+  healthCheck:
+    protocol: HTTP
+    port: 80
+    path: /healthz
+    interval: 60s
+    failureThreshold: 3
+
+---
+# DNSRecord - Manually created DNS record (v1alpha1)
+# In production, Kuadrant operator creates DNSRecords automatically from DNSPolicy
+# For testing, we create one manually to validate DNS operator reconciliation
+apiVersion: kuadrant.io/v1alpha1
+kind: DNSRecord
+metadata:
+  name: echo-dns-record
+  namespace: dns-test
+  labels:
+    app.kubernetes.io/part-of: rhcl-dns-test
+spec:
+  # Root domain for DNS records
+  rootHost: echo.dns-test.example.com
+
+  # Reference to DNS provider credentials
+  providerRef:
+    name: dns-provider-credentials-mock
+
+  # DNS endpoints to create
+  endpoints:
+  - dnsName: echo.dns-test.example.com
+    recordType: A
+    recordTTL: 60
+    targets:
+    - "192.168.1.100"  # Mock IP - replace with actual Gateway IP
+    - "192.168.1.101"
+
+---
+# DNSHealthCheckProbe - Health monitoring for DNS endpoints (v1alpha1)
+apiVersion: kuadrant.io/v1alpha1
+kind: DNSHealthCheckProbe
+metadata:
+  name: echo-health-probe
+  namespace: dns-test
+  labels:
+    app.kubernetes.io/part-of: rhcl-dns-test
+spec:
+  # Target address to health check
+  address: "192.168.1.100"  # Mock IP - replace with actual Gateway IP
+  hostname: echo.dns-test.example.com
+  protocol: HTTP
+  port: 80
+  path: /healthz
+  interval: 60s
+  failureThreshold: 5
+  allowInsecureCertificate: true  # For testing without TLS
+
+---
+# Validation ConfigMap
+# Contains expected validation checks
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dns-test-validation
+  namespace: dns-test
+data:
+  validation-checklist.yaml: |
+    # DNS Operator Validation Checklist
+
+    operator_deployment:
+      - name: "DNS operator pod running"
+        command: "kubectl get pods -n kuadrant-operators -l control-plane=dns-operator-controller-manager"
+        expected: "Running 1/1"
+
+      - name: "DNS operator not on GPU node"
+        command: "kubectl get pods -n kuadrant-operators -l control-plane=dns-operator-controller-manager -o jsonpath='{.items[0].spec.affinity}'"
+        expected: "sku NotIn [gpu]"
+
+      - name: "DNS operator has correct image"
+        command: "kubectl get deployment dns-operator-controller-manager -n kuadrant-operators -o jsonpath='{.spec.template.spec.containers[0].image}'"
+        expected: "registry.redhat.io/rhcl-1/dns-rhel9-operator@sha256:61e8a471cf20273fe879031eb302a1c7179b5423db4f0a8b9dccefae753ffdf4"
+
+    rbac:
+      - name: "DNS operator ClusterRole exists"
+        command: "kubectl get clusterrole dns-operator-manager-role"
+        expected: "exists"
+
+      - name: "DNS operator ClusterRoleBinding exists"
+        command: "kubectl get clusterrolebinding dns-operator-manager-rolebinding"
+        expected: "exists"
+
+      - name: "DNS operator has Gateway API permissions"
+        command: "kubectl get clusterrole dns-operator-manager-role -o jsonpath='{.rules[?(@.apiGroups[0]==\"gateway.networking.k8s.io\")].resources}'"
+        expected: "[gateways, httproutes]"
+
+    crds:
+      - name: "DNSPolicy CRD exists"
+        command: "kubectl get crd dnspolicies.kuadrant.io"
+        expected: "exists"
+
+      - name: "DNSRecord CRD exists"
+        command: "kubectl get crd dnsrecords.kuadrant.io"
+        expected: "exists"
+
+      - name: "DNSHealthCheckProbe CRD exists"
+        command: "kubectl get crd dnshealthcheckprobes.kuadrant.io"
+        expected: "exists"
+
+    resources:
+      - name: "DNSPolicy created"
+        command: "kubectl get dnspolicy dns-test-policy -n dns-test"
+        expected: "exists"
+
+      - name: "DNSRecord created"
+        command: "kubectl get dnsrecord echo-dns-record -n dns-test"
+        expected: "exists"
+
+      - name: "DNSHealthCheckProbe created"
+        command: "kubectl get dnshealthcheckprobe echo-health-probe -n dns-test"
+        expected: "exists"
+
+      - name: "DNSPolicy has status"
+        command: "kubectl get dnspolicy dns-test-policy -n dns-test -o jsonpath='{.status}'"
+        expected: "non-empty (may show Accepted/Enforced conditions)"
+
+      - name: "DNSRecord has status"
+        command: "kubectl get dnsrecord echo-dns-record -n dns-test -o jsonpath='{.status}'"
+        expected: "non-empty (may show errors without valid provider credentials)"
+
+    operator_logs:
+      - name: "DNS operator is reconciling DNSPolicy"
+        command: "kubectl logs -n kuadrant-operators deployment/dns-operator-controller-manager --tail=100 | grep -i dnspolicy"
+        expected: "reconciliation logs visible"
+
+      - name: "DNS operator is reconciling DNSRecord"
+        command: "kubectl logs -n kuadrant-operators deployment/dns-operator-controller-manager --tail=100 | grep -i dnsrecord"
+        expected: "reconciliation logs visible"
+
+    expected_behavior_without_credentials:
+      - name: "DNSRecord shows provider error"
+        description: "Without valid cloud provider credentials, DNSRecord status should show authentication/configuration errors"
+        command: "kubectl describe dnsrecord echo-dns-record -n dns-test | grep -A 5 Conditions"
+        expected: "Error conditions related to provider authentication (this is expected)"
+
+      - name: "DNS operator continues running"
+        description: "DNS operator should remain Running despite DNSRecord errors"
+        command: "kubectl get pods -n kuadrant-operators -l control-plane=dns-operator-controller-manager"
+        expected: "Running 1/1 (operator doesn't crash)"
+
+    notes: |
+      # Important Notes
+
+      1. **No Operand Deployments**: DNS operator does NOT create component deployments
+         - Authorino operator creates authorino-authorino deployment
+         - Limitador operator creates limitador-limitador deployment
+         - DNS operator DOES NOT create any deployments (it manages DNS directly)
+
+      2. **Provider Credentials Required**: For full functionality:
+         - AWS Route53: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION
+         - Azure DNS: AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
+         - GCP Cloud DNS: GCP_SERVICE_ACCOUNT_KEY (JSON)
+
+      3. **Expected Behavior Without Credentials**:
+         - DNS operator pod: Running (✅)
+         - DNSPolicy: Created, Accepted=True (✅)
+         - DNSRecord: Created, but Ready=False with provider errors (⚠️ expected)
+         - DNSHealthCheckProbe: Created, but probes fail (⚠️ expected)
+
+      4. **Gateway Integration**:
+         - DNSPolicy watches Gateway resources
+         - Kuadrant operator creates DNSRecords automatically from DNSPolicy
+         - Manual DNSRecords (like this test) are also supported
+
+      5. **Validation Success Criteria**:
+         - ✅ DNS operator pod Running and not on GPU node
+         - ✅ All 3 DNS CRDs exist
+         - ✅ RBAC configured correctly
+         - ✅ Test resources created without errors
+         - ✅ DNS operator logs show reconciliation attempts
+         - ⚠️ DNSRecord/DNSHealthCheckProbe may show errors (acceptable without credentials)

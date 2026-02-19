@@ -82,6 +82,12 @@ The script checks for required operators:
 - **Not present + wide-ep-lws profile** → FAIL (required)
 - **Present but pods failing** → FAIL
 
+### RHCL (Red Hat Connectivity Link) Operator
+- **Namespace**: `kuadrant-operators`
+- **Not present** → WARN (optional - provides API gateway, auth, rate limiting)
+- **Present but pods failing** → FAIL
+- **Components checked**: kuadrant-operator, authorino-operator, limitador-operator
+
 ## Monitoring Validation
 
 The script validates the monitoring stack required for metrics and autoscaling:

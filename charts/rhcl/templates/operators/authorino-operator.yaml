@@ -1,0 +1,92 @@
+{{- if .Values.operators.authorino.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authorino-operator
+  namespace: {{ .Values.namespaces.operators }}
+  labels:
+    control-plane: authorino-operator
+    app.kubernetes.io/name: authorino-operator
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: rhcl
+spec:
+  replicas: {{ .Values.operators.authorino.replicas }}
+  selector:
+    matchLabels:
+      control-plane: authorino-operator
+  template:
+    metadata:
+      labels:
+        control-plane: authorino-operator
+        app.kubernetes.io/name: authorino-operator
+        app.kubernetes.io/component: operator
+        app.kubernetes.io/part-of: rhcl
+    spec:
+      serviceAccountName: authorino-operator
+      {{- with .Values.operators.authorino.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.operators.authorino.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.operators.authorino.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        {{- if .Values.operators.authorino.podSecurityContext }}
+        {{- toYaml .Values.operators.authorino.podSecurityContext | nindent 8 }}
+        {{- else }}
+        seccompProfile:
+          type: RuntimeDefault
+        {{- end }}
+      containers:
+      - name: manager
+        image: {{ .Values.images.registry }}/{{ .Values.images.operators.authorino.repository }}@{{ .Values.images.operators.authorino.digest }}
+        imagePullPolicy: {{ .Values.images.pullPolicy }}
+        command:
+        - /manager
+        args:
+        - --leader-elect
+        env:
+        - name: RELATED_IMAGE_AUTHORINO
+          value: {{ .Values.images.registry }}/{{ .Values.images.components.authorino.repository }}@{{ .Values.images.components.authorino.digest }}
+        {{- with .Values.operators.authorino.env }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        ports:
+        - name: metrics
+          containerPort: 8080
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+            scheme: HTTP
+          initialDelaySeconds: 15
+          periodSeconds: 20
+          timeoutSeconds: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 1
+          failureThreshold: 3
+        resources:
+          {{- toYaml .Values.operators.authorino.resources | nindent 10 }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          seccompProfile:
+            type: RuntimeDefault
+{{- end }}

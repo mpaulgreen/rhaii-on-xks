@@ -1,0 +1,93 @@
+{{- if .Values.operators.limitador.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: limitador-operator-controller-manager
+  namespace: {{ .Values.namespaces.operators }}
+  labels:
+    app: limitador-operator
+    control-plane: controller-manager
+    app.kubernetes.io/name: limitador-operator
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: rhcl
+spec:
+  replicas: {{ .Values.operators.limitador.replicas }}
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+  template:
+    metadata:
+      labels:
+        app: limitador-operator
+        control-plane: controller-manager
+        app.kubernetes.io/name: limitador-operator
+        app.kubernetes.io/component: operator
+        app.kubernetes.io/part-of: rhcl
+    spec:
+      serviceAccountName: limitador-operator-controller-manager
+      {{- with .Values.operators.limitador.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.operators.limitador.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.operators.limitador.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        {{- if .Values.operators.limitador.podSecurityContext }}
+        {{- toYaml .Values.operators.limitador.podSecurityContext | nindent 8 }}
+        {{- else }}
+        seccompProfile:
+          type: RuntimeDefault
+        {{- end }}
+      containers:
+      - name: manager
+        image: {{ .Values.images.registry }}/{{ .Values.images.operators.limitador.repository }}@{{ .Values.images.operators.limitador.digest }}
+        imagePullPolicy: {{ .Values.images.pullPolicy }}
+        command:
+        - /manager
+        args:
+        - --leader-elect
+        env:
+        - name: RELATED_IMAGE_LIMITADOR
+          value: {{ .Values.images.registry }}/{{ .Values.images.components.limitador.repository }}@{{ .Values.images.components.limitador.digest }}
+        {{- with .Values.operators.limitador.env }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        ports:
+        - name: metrics
+          containerPort: 8080
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+            scheme: HTTP
+          initialDelaySeconds: 15
+          periodSeconds: 20
+          timeoutSeconds: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 1
+          failureThreshold: 3
+        resources:
+          {{- toYaml .Values.operators.limitador.resources | nindent 10 }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+{{- end }}

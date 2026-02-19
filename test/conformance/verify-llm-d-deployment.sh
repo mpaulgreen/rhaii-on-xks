@@ -1781,6 +1781,48 @@ check_lws_operator() {
     fi
 }
 
+# Check RHCL (Red Hat Connectivity Link) operator
+# - Not present → WARN (optional infrastructure)
+# - Present but pods failing → FAIL
+check_rhcl_operator() {
+    log_info "Checking RHCL (Red Hat Connectivity Link) operator..."
+
+    local operator_ns="kuadrant-operators"
+
+    # Check if operator namespace exists
+    if ! $KUBECTL get namespace "$operator_ns" &> /dev/null; then
+        log_warn "RHCL operator not installed (namespace $operator_ns not found)"
+        return 0
+    fi
+
+    # Namespace exists - check pods
+    local total running failed
+    total=$($KUBECTL get pods -n "$operator_ns" --no-headers 2>/dev/null | wc -l | tr -d '[:space:]')
+    running=$($KUBECTL get pods -n "$operator_ns" --no-headers 2>/dev/null | grep -c "Running" | tr -d '[:space:]' || echo "0")
+    failed=$($KUBECTL get pods -n "$operator_ns" --no-headers 2>/dev/null | grep -cE "Error|CrashLoop|Failed" | tr -d '[:space:]' || echo "0")
+
+    if [[ "${failed:-0}" -gt 0 ]]; then
+        log_fail "RHCL operator: $failed pod(s) failing in $operator_ns"
+        return 1
+    elif [[ "${running:-0}" -gt 0 ]]; then
+        log_pass "RHCL operator: $running pod(s) running"
+    else
+        log_warn "RHCL operator: no running pods in $operator_ns"
+    fi
+
+    # Check for key RHCL components
+    local kuadrant authorino limitador
+    kuadrant=$($KUBECTL get pods -n "$operator_ns" --no-headers 2>/dev/null | grep -c "kuadrant-operator" | tr -d '[:space:]' || echo "0")
+    authorino=$($KUBECTL get pods -n "$operator_ns" --no-headers 2>/dev/null | grep -c "authorino-operator" | tr -d '[:space:]' || echo "0")
+    limitador=$($KUBECTL get pods -n "$operator_ns" --no-headers 2>/dev/null | grep -c "limitador-operator" | tr -d '[:space:]' || echo "0")
+
+    if [[ "${kuadrant:-0}" -gt 0 && "${authorino:-0}" -gt 0 && "${limitador:-0}" -gt 0 ]]; then
+        log_pass "All RHCL operators running (kuadrant, authorino, limitador)"
+    else
+        log_warn "Some RHCL operators missing (k:$kuadrant a:$authorino l:$limitador)"
+    fi
+}
+
 check_namespace() {
     log_section "2. Namespace Validation"
 
@@ -2043,6 +2085,7 @@ main() {
     log_section "1b. Operator Prerequisites"
     check_cert_manager || true
     check_istio || true
+    check_rhcl_operator || true
 
     if [[ "$DEPLOYMENT_MODE" == "kserve" ]]; then
         # KServe-specific checks

@@ -95,6 +95,27 @@ done
 echo "$CRDS" | grep -E "leaderworkerset\.x-k8s\.io" | while read -r crd; do
     kubectl delete "$crd" --ignore-not-found 2>/dev/null || true
 done
+# RHCL CRDs (Kuadrant, Authorino, Limitador)
+# Remove finalizers from RHCL CRs first
+kubectl get kuadrant --all-namespaces -o name 2>/dev/null | while read -r cr; do
+    kubectl patch "$cr" -p '{"metadata":{"finalizers":[]}}' --type=merge 2>/dev/null || true
+done
+kubectl get authorino --all-namespaces -o name 2>/dev/null | while read -r cr; do
+    kubectl patch "$cr" -p '{"metadata":{"finalizers":[]}}' --type=merge 2>/dev/null || true
+done
+kubectl get limitador --all-namespaces -o name 2>/dev/null | while read -r cr; do
+    kubectl patch "$cr" -p '{"metadata":{"finalizers":[]}}' --type=merge 2>/dev/null || true
+done
+kubectl get authconfig --all-namespaces -o name 2>/dev/null | while read -r cr; do
+    kubectl patch "$cr" -p '{"metadata":{"finalizers":[]}}' --type=merge 2>/dev/null || true
+done
+kubectl get dnsrecord --all-namespaces -o name 2>/dev/null | while read -r cr; do
+    kubectl patch "$cr" -p '{"metadata":{"finalizers":[]}}' --type=merge 2>/dev/null || true
+done
+# Delete RHCL CRDs
+echo "$CRDS" | grep -E "kuadrant\.io|authorino\.kuadrant\.io|limitador\.kuadrant\.io" | while read -r crd; do
+    kubectl delete "$crd" --ignore-not-found 2>/dev/null || true
+done
 # Operator CRDs (exact names to avoid matching other OpenShift operators)
 kubectl delete crd certmanagers.operator.openshift.io leaderworkersetoperators.operator.openshift.io istiocsrs.operator.openshift.io --ignore-not-found 2>/dev/null || true
 # Gateway API CRDs and Inference Extension CRDs (InferencePool, InferenceModel)
@@ -115,6 +136,8 @@ kubectl delete namespace cert-manager --ignore-not-found --wait=false 2>/dev/nul
 kubectl delete namespace cert-manager-operator --ignore-not-found --wait=false 2>/dev/null || true
 kubectl delete namespace istio-system --ignore-not-found --wait=false 2>/dev/null || true
 kubectl delete namespace openshift-lws-operator --ignore-not-found --wait=false 2>/dev/null || true
+kubectl delete namespace kuadrant-operators --ignore-not-found --wait=false 2>/dev/null || true
+kubectl delete namespace kuadrant-system --ignore-not-found --wait=false 2>/dev/null || true
 kubectl delete namespace opendatahub --ignore-not-found --wait=false 2>/dev/null || true
 
 log "=== Cleanup Complete ==="

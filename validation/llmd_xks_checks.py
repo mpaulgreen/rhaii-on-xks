@@ -107,6 +107,22 @@ class LLMDXKSChecks:
                             "optional": True
                         },
                         {
+                            "name": "crd_rhcl",
+                            "function": self.test_crd_rhcl,
+                            "description": "test if the cluster has the RHCL (Red Hat Connectivity Link) crds",
+                            "suggested_action": "install RHCL: make deploy-rhcl",
+                            "result": False,
+                            "optional": True
+                        },
+                        {
+                            "name": "operator_rhcl",
+                            "function": self.test_operator_rhcl,
+                            "description": "test if the RHCL operators are running properly",
+                            "suggested_action": "install or verify RHCL operator deployments",
+                            "result": False,
+                            "optional": True
+                        },
+                        {
                             "name": "crd_kserve",
                             "function": self.test_crd_kserve,
                             "description": "test if the cluster has the kserve crds",
@@ -267,6 +283,31 @@ class LLMDXKSChecks:
     def test_operator_kserve(self):
         test_failed = False
         if not self._deployment_ready("opendatahub", "kserve-controller-manager"):
+            test_failed = True
+        return not test_failed
+
+    def test_crd_rhcl(self):
+        required_crds = [
+            "kuadrants.kuadrant.io",
+            "authorinos.operator.authorino.kuadrant.io",
+            "limitadors.limitador.kuadrant.io",
+            "authpolicies.kuadrant.io",
+            "ratelimitpolicies.kuadrant.io",
+        ]
+        if self._test_crds_present(required_crds):
+            self.logger.info("All required RHCL CRDs are present")
+            return True
+        else:
+            self.logger.warning("Missing RHCL CRDs")
+            return False
+
+    def test_operator_rhcl(self):
+        test_failed = False
+        if not self._deployment_ready("kuadrant-operators", "kuadrant-operator-controller-manager"):
+            test_failed = True
+        if not self._deployment_ready("kuadrant-operators", "authorino-operator"):
+            test_failed = True
+        if not self._deployment_ready("kuadrant-operators", "limitador-operator-controller-manager"):
             test_failed = True
         return not test_failed
 

@@ -1,0 +1,15 @@
+# Helm Chart Specific Patterns
+# (IDE, OS, and common temp files are already ignored by root .gitignore)
+
+# Helm package archives
+*.tgz
+
+# Helmfile local state cache
+.helmfile/
+
+# Rendered manifests (generated during testing)
+rendered/
+output/
+
+# Claude development notes (not for distribution)
+.claude_dev/

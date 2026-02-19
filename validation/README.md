@@ -81,6 +81,8 @@ Suite: operators -- Operator readiness tests
 | `operator_sail` | Check if sail-operator deployments are ready |
 | `crd_lwsoperator`  | The tool checks if lws-operator CRDs are present on the cluster |
 | `operator_lws`     | Check if lws-operator deployments are ready |
+| `crd_rhcl`         | The tool checks if RHCL (Red Hat Connectivity Link) CRDs are present on the cluster (optional) |
+| `operator_rhcl`    | Check if RHCL operator deployments are ready (optional) |
 | `crd_kserve`       | The tool checks if kserve CRDs are present on the cluster |
 | `operator_kserve`  | Check if kserve-controller-manager deployment is ready |
 

@@ -1,0 +1,46 @@
+{{- if and .Values.rbac.create .Values.operators.authorino.enabled }}
+# ClusterRole for Authorino component deployment (created by authorino-operator)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: authorino-manager-role
+  labels:
+    app: authorino
+    app.kubernetes.io/name: authorino
+    app.kubernetes.io/part-of: rhcl
+rules:
+# Authorino CRDs
+- apiGroups: ["authorino.kuadrant.io"]
+  resources: ["authconfigs"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+- apiGroups: ["authorino.kuadrant.io"]
+  resources: ["authconfigs/status"]
+  verbs: ["get", "patch", "update"]
+# Coordination for leader election
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["create", "get", "list", "update"]
+# Secrets (for auth credentials)
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "watch"]
+
+---
+# ClusterRole for Authorino K8s auth
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: authorino-manager-k8s-auth-role
+  labels:
+    app: authorino
+    app.kubernetes.io/name: authorino
+    app.kubernetes.io/part-of: rhcl
+rules:
+# TokenReview and SubjectAccessReview for K8s auth
+- apiGroups: ["authentication.k8s.io"]
+  resources: ["tokenreviews"]
+  verbs: ["create"]
+- apiGroups: ["authorization.k8s.io"]
+  resources: ["subjectaccessreviews"]
+  verbs: ["create"]
+{{- end }}

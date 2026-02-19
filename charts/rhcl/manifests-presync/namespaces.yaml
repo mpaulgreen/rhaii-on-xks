@@ -1,0 +1,19 @@
+# Namespaces for RHCL operators and instances
+# Created in presync to ensure they exist before Helm install
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kuadrant-operators
+  labels:
+    app.kubernetes.io/part-of: rhcl
+    app.kubernetes.io/managed-by: rhaii-on-xks
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kuadrant-system
+  labels:
+    app.kubernetes.io/part-of: rhcl
+    app.kubernetes.io/managed-by: rhaii-on-xks

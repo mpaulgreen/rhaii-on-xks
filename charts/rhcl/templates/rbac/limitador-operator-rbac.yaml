@@ -1,0 +1,71 @@
+{{- if and .Values.rbac.create .Values.operators.limitador.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: limitador-operator-manager-role
+  labels:
+    app.kubernetes.io/name: limitador-operator
+    app.kubernetes.io/part-of: rhcl
+rules:
+# Core resources
+- apiGroups: [""]
+  resources: ["events", "configmaps", "secrets", "services", "serviceaccounts", "pods"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["get", "list", "watch"]
+# Apps
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments/status"]
+  verbs: ["get", "patch", "update"]
+# Coordination for leader election
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+# Limitador CRDs
+- apiGroups: ["limitador.kuadrant.io"]
+  resources: ["limitadors"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+- apiGroups: ["limitador.kuadrant.io"]
+  resources: ["limitadors/status", "limitadors/finalizers"]
+  verbs: ["get", "patch", "update"]
+# PersistentVolumeClaims (for Redis storage)
+- apiGroups: [""]
+  resources: ["persistentvolumeclaims"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+# Monitoring
+- apiGroups: ["monitoring.coreos.com"]
+  resources: ["servicemonitors", "podmonitors"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+# PodDisruptionBudgets (for HA deployments)
+- apiGroups: ["policy"]
+  resources: ["poddisruptionbudgets"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+# Authentication/Authorization
+- apiGroups: ["authentication.k8s.io"]
+  resources: ["tokenreviews"]
+  verbs: ["create"]
+- apiGroups: ["authorization.k8s.io"]
+  resources: ["subjectaccessreviews"]
+  verbs: ["create"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: limitador-operator-manager-rolebinding
+  labels:
+    app.kubernetes.io/name: limitador-operator
+    app.kubernetes.io/part-of: rhcl
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: limitador-operator-manager-role
+subjects:
+- kind: ServiceAccount
+  name: limitador-operator-controller-manager
+  namespace: {{ .Values.namespaces.operators }}
+{{- end }}

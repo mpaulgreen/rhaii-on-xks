@@ -237,6 +237,67 @@ Istio version: v1.27.5
 
 ---
 
+## 3a. Optional: Deploy RHCL for API Gateway Features
+
+RHCL (Red Hat Connectivity Link) provides authentication, rate limiting, and DNS management for your inference services. **This is optional** - skip this section if you only need basic inference routing.
+
+### 3a.1 When to Deploy RHCL
+
+Deploy RHCL if you need:
+- API key or OIDC authentication on inference endpoints
+- Rate limiting per user or tenant
+- Multi-cluster DNS routing for HA
+- Advanced TLS policy management
+
+### 3a.2 Prerequisites
+
+Verify cert-manager and Istio are deployed:
+```bash
+kubectl get pods -n cert-manager
+kubectl get pods -n istio-system
+```
+
+### 3a.3 Deploy RHCL
+
+From the repository root:
+```bash
+make deploy-rhcl
+```
+
+**Deployment time:** ~2 minutes
+
+### 3a.4 Verify RHCL Deployment
+
+Check operator status:
+```bash
+# Check RHCL operators
+kubectl get deployments -n kuadrant-operators
+
+# Expected output:
+# NAME                                      READY   UP-TO-DATE   AVAILABLE
+# kuadrant-operator-controller-manager      1/1     1            1
+# authorino-operator                        1/1     1            1
+# limitador-operator-controller-manager     1/1     1            1
+
+# Check RHCL instances
+kubectl get kuadrant,authorino,limitador -n kuadrant-system
+
+# Expected output:
+# NAME                                READY
+# kuadrant.kuadrant.io/kuadrant       True
+```
+
+### 3a.5 RHCL Documentation
+
+For detailed RHCL configuration (AuthPolicy, RateLimitPolicy examples), see:
+- [RHCL Chart README](../charts/rhcl/README.md)
+- [RHCL Architecture](../charts/rhcl/ARCHITECTURE.md)
+- [Kuadrant Documentation](https://docs.kuadrant.io/)
+
+**Next:** Continue to [Phase 4: Configuring the Inference Gateway](#4-configuring-the-inference-gateway)
+
+---
+
 ## 4. Configuring the Inference Gateway
 
 ### 4.1 Create the Gateway

@@ -5,7 +5,8 @@
 #   helmfile apply --selector name=cert-manager-operator  # Deploy only cert-manager
 #   helmfile apply --selector name=sail-operator          # Deploy only istio
 #   helmfile apply --selector name=lws-operator           # Deploy only lws
-#   helmfile sync  --selector name=kserve-rhaii-xks        # Deploy only Kserve
+#   helmfile apply --selector name=rhcl                   # Deploy only rhcl (optional - API gateway)
+#   helmfile sync  --selector name=kserve-rhaii-xks       # Deploy only Kserve
 #   helmfile destroy                                      # Remove all
 
 environments:
@@ -38,6 +39,18 @@ helmfiles:
     values:
       - useSystemPodmanAuth: {{ .Values.useSystemPodmanAuth | default true }}
       - pullSecretFile: {{ .Values.pullSecretFile | default "" | quote }}
+
+  # rhcl (Red Hat Connectivity Link) - optional API gateway, auth, rate limiting
+  - path: charts/rhcl/helmfile.yaml.gotmpl
+    selectorsInherited: true
+    values:
+      - useSystemPodmanAuth: {{ .Values.useSystemPodmanAuth | default true }}
+      - pullSecretFile: {{ .Values.pullSecretFile | default "" | quote }}
+{{- if and .Values.rhclOperator .Values.rhclOperator.operators .Values.rhclOperator.operators.dns }}
+      - operators:
+          dns:
+            enabled: {{ .Values.rhclOperator.operators.dns.enabled | default false }}
+{{- end }}
 
 ---
 
