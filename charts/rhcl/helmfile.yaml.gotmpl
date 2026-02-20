@@ -29,24 +29,34 @@ releases:
             dockerConfigJson: {{ .Values.images.pullSecret.dockerConfigJson | quote }}
 {{- else if .Values.pullSecretFile }}
       # SECURITY WARNING: Only use pullSecretFile with trusted values.yaml sources
-      # Path validation: Ensure file is under HOME directory or /tmp
+      # Path validation: Ensure file is under HOME directory (canonicalized and verified to exist)
       {{- $home := env "HOME" }}
-      {{- if and (not (hasPrefix $home .Values.pullSecretFile)) (not (hasPrefix "/tmp" .Values.pullSecretFile)) (not (hasPrefix "~" .Values.pullSecretFile)) }}
-        {{- fail (printf "pullSecretFile path '%s' must be under HOME (%s) or /tmp for security" .Values.pullSecretFile $home) }}
+      {{- if eq $home "" }}
+        {{- fail "pullSecretFile requires HOME environment variable to be set for security validation" }}
+      {{- end }}
+      {{- $resolvedPath := exec "realpath" (list "-e" .Values.pullSecretFile) | trim }}
+      {{- $homeWithSlash := printf "%s/" $home }}
+      {{- if and (ne $resolvedPath $home) (not (hasPrefix $homeWithSlash $resolvedPath)) }}
+        {{- fail (printf "pullSecretFile resolved path '%s' must be under HOME (%s) for security" $resolvedPath $home) }}
       {{- end }}
       - images:
           pullSecret:
-            dockerConfigJson: {{ exec "cat" (list .Values.pullSecretFile) | quote }}
+            dockerConfigJson: {{ exec "cat" (list $resolvedPath) | quote }}
 {{- else if .Values.authFile }}
       # SECURITY WARNING: Only use authFile with trusted values.yaml sources
-      # Path validation: Ensure file is under HOME directory or /tmp
+      # Path validation: Ensure file is under HOME directory (canonicalized and verified to exist)
       {{- $home := env "HOME" }}
-      {{- if and (not (hasPrefix $home .Values.authFile)) (not (hasPrefix "/tmp" .Values.authFile)) (not (hasPrefix "~" .Values.authFile)) }}
-        {{- fail (printf "authFile path '%s' must be under HOME (%s) or /tmp for security" .Values.authFile $home) }}
+      {{- if eq $home "" }}
+        {{- fail "authFile requires HOME environment variable to be set for security validation" }}
+      {{- end }}
+      {{- $resolvedPath := exec "realpath" (list "-e" .Values.authFile) | trim }}
+      {{- $homeWithSlash := printf "%s/" $home }}
+      {{- if and (ne $resolvedPath $home) (not (hasPrefix $homeWithSlash $resolvedPath)) }}
+        {{- fail (printf "authFile resolved path '%s' must be under HOME (%s) for security" $resolvedPath $home) }}
       {{- end }}
       - images:
           pullSecret:
-            dockerConfigJson: {{ exec "cat" (list .Values.authFile) | quote }}
+            dockerConfigJson: {{ exec "cat" (list $resolvedPath) | quote }}
 {{- end }}
     hooks:
       # PREUNINSTALL Phase: Clean up Kuadrant instance and sub-operator resources before deleting operators
@@ -201,6 +211,55 @@ releases:
             spec: {}
             EOF
 
+{{- if .Values.images.pullSecret.create }}
+      # Configure imagePullSecrets for component deployments (BEFORE waiting for Kuadrant Ready)
+      - events: ["postsync"]
+        showlogs: true
+        command: bash
+        args:
+          - -c
+          - |
+            echo "Configuring imagePullSecrets for component ServiceAccounts..."
+            INSTANCE_NAMESPACE="{{ .Values.namespaces.instances | default "kuadrant-system" }}"
+            PULL_SECRET="{{ .Values.images.pullSecret.name | default "redhat-pull-secret" }}"
+
+            # Wait for Limitador CR to be created by Kuadrant operator
+            echo "Waiting for Limitador CR to be created..."
+            LIMITADOR_FOUND=false
+            for i in {1..60}; do
+              if kubectl get limitador -n $INSTANCE_NAMESPACE >/dev/null 2>&1; then
+                echo "Limitador CR found"
+                LIMITADOR_FOUND=true
+                break
+              fi
+              sleep 2
+            done
+            if [ "$LIMITADOR_FOUND" = "false" ]; then
+              echo "WARNING: Limitador CR not found after 120s - Kuadrant operator may have failed"
+            fi
+
+            # Patch default ServiceAccount for Limitador (uses default SA)
+            echo "Patching default ServiceAccount in $INSTANCE_NAMESPACE..."
+            kubectl patch serviceaccount default -n $INSTANCE_NAMESPACE \
+              -p "{\"imagePullSecrets\": [{\"name\": \"$PULL_SECRET\"}]}" || {
+              echo "Warning: Failed to patch default ServiceAccount"
+            }
+
+            # Configure Limitador CR with imagePullSecrets if supported
+            if kubectl get limitador -n $INSTANCE_NAMESPACE >/dev/null 2>&1; then
+              echo "Configuring Limitador CR with imagePullSecrets..."
+              kubectl patch limitador limitador -n $INSTANCE_NAMESPACE \
+                --type=merge \
+                -p "{\"spec\":{\"imagePullSecrets\":[{\"name\":\"$PULL_SECRET\"}]}}" || {
+                echo "Warning: Limitador CRD may not support imagePullSecrets field"
+              }
+              # Delete failed pods so they restart with pull secrets
+              kubectl delete pods -n $INSTANCE_NAMESPACE -l limitador-resource=limitador --ignore-not-found=true
+            fi
+
+            echo "ImagePullSecrets configuration complete!"
+{{- end }}
+
       # Wait for Kuadrant instance to be ready
       - events: ["postsync"]
         showlogs: true
@@ -220,37 +279,6 @@ releases:
             }
             echo "Kuadrant instance is ready!"
 
-{{- if .Values.images.pullSecret.create }}
-      # Configure imagePullSecrets for component deployments
-      - events: ["postsync"]
-        showlogs: true
-        command: bash
-        args:
-          - -c
-          - |
-            echo "Configuring imagePullSecrets for component ServiceAccounts..."
-            INSTANCE_NAMESPACE="{{ .Values.namespaces.instances | default "kuadrant-system" }}"
-            PULL_SECRET="{{ .Values.images.pullSecret.name | default "redhat-pull-secret" }}"
-
-            # Patch default ServiceAccount for Limitador (uses default SA)
-            echo "Patching default ServiceAccount in $INSTANCE_NAMESPACE..."
-            kubectl patch serviceaccount default -n $INSTANCE_NAMESPACE \
-              -p "{\"imagePullSecrets\": [{\"name\": \"$PULL_SECRET\"}]}" || {
-              echo "Warning: Failed to patch default ServiceAccount"
-            }
-
-            # Configure Limitador CR with imagePullSecrets if supported
-            if kubectl get limitador -n $INSTANCE_NAMESPACE >/dev/null 2>&1; then
-              echo "Configuring Limitador CR with imagePullSecrets..."
-              kubectl patch limitador limitador -n $INSTANCE_NAMESPACE \
-                --type=merge \
-                -p "{\"spec\":{\"imagePullSecrets\":[{\"name\":\"$PULL_SECRET\"}]}}" || {
-                echo "Warning: Limitador CRD may not support imagePullSecrets field"
-              }
-            fi
-
-            echo "ImagePullSecrets configuration complete!"
-{{- end }}
 
       # Validate Authorino and Limitador instances were created
       - events: ["postsync"]

@@ -241,6 +241,12 @@ Istio version: v1.27.5
 
 RHCL (Red Hat Connectivity Link) provides authentication, rate limiting, and DNS management for your inference services. **This is optional** - skip this section if you only need basic inference routing.
 
+> **Security Note:** RHCL manages authentication and rate limiting for external access to your inference endpoints. Before and after deployment, ensure you:
+> - Configure API keys with minimum 32 characters of random entropy (e.g., `openssl rand -base64 32`) or integrate with your organization's OIDC provider (recommended for production)
+> - Apply NetworkPolicies to restrict ingress to kuadrant-operators and kuadrant-system namespaces (deny all except from istio-system and kube-system)
+> - Configure rate limits appropriate for your deployment (typical production: 100-1000 requests/minute per tenant)
+> - See the RHCL documentation for detailed AuthPolicy and RateLimitPolicy configuration examples
+
 ### 3a.1 When to Deploy RHCL
 
 Deploy RHCL if you need:
@@ -294,7 +300,7 @@ For detailed RHCL configuration (AuthPolicy, RateLimitPolicy examples), see:
 - [RHCL Architecture](../charts/rhcl/ARCHITECTURE.md)
 - [Kuadrant Documentation](https://docs.kuadrant.io/)
 
-**Next:** Continue to [Phase 4: Configuring the Inference Gateway](#4-configuring-the-inference-gateway)
+**Next:** Continue to [Section 4: Configuring the Inference Gateway](#4-configuring-the-inference-gateway)
 
 ---
 

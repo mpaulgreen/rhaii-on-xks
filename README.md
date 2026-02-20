@@ -195,7 +195,7 @@ rhclOperator:
   enabled: true   # Enabled by default - set to false if not needed
   operators:
     dns:
-      enabled: false  # Diasbled by default - requires cloud DNS credentials for full functionality
+      enabled: false  # Disabled by default - requires cloud DNS credentials for full functionality
 ```
 
 ---

@@ -203,13 +203,20 @@ spec:
 
 ---
 # Istio AuthorizationPolicy - Allow all traffic
+# WARNING: TEST ONLY - This allows ALL traffic and should NEVER be used in production
 # This prevents Istio's RBAC from blocking requests before RHCL policies can enforce
 apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
 metadata:
   name: allow-all
   namespace: rhcl-test
+  labels:
+    environment: test
+    security-review: allow-all-policy
 spec:
+  selector:
+    matchLabels:
+      app: echo
   action: ALLOW
   rules:
   - {}

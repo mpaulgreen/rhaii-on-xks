@@ -202,7 +202,7 @@ print_status ok "Test manifest applied"
 echo -e "\n${BLUE}Step 6: Copying pull secrets to test namespace${NC}"
 if kubectl get secret redhat-pull-secret -n "$KUADRANT_NAMESPACE" &>/dev/null; then
     kubectl get secret redhat-pull-secret -n "$KUADRANT_NAMESPACE" -o yaml | \
-        sed "s/namespace: $KUADRANT_NAMESPACE/namespace: $TEST_NAMESPACE/" | \
+        sed "s|namespace: $KUADRANT_NAMESPACE|namespace: $TEST_NAMESPACE|" | \
         kubectl apply -f - &>/dev/null
     print_status ok "Pull secret copied to $TEST_NAMESPACE"
 else

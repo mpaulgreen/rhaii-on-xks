@@ -44,7 +44,7 @@ rules:
 # RBAC - Authorino operator creates Roles/RoleBindings
 - apiGroups: ["rbac.authorization.k8s.io"]
   resources: ["roles", "rolebindings", "clusterroles", "clusterrolebindings"]
-  verbs: ["create", "delete", "get", "list", "patch", "update", "watch", "bind", "escalate"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
 # Authentication/Authorization
 - apiGroups: ["authentication.k8s.io"]
   resources: ["tokenreviews"]

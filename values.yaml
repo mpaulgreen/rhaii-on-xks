@@ -38,8 +38,7 @@ rhclOperator:
       # - Set to true here AND in charts/rhcl/values.yaml for full deployment
       # - This root setting takes precedence when deploying via make deploy-all
       # - Requires Azure/AWS/GCP DNS credentials for full functionality
-      # - Basic operator validation works without credentials (pods will start)
-      enabled: false
+      enabled: true
 
 # =============================================================================
 # KServe

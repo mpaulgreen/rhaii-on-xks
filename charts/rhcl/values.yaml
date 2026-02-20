@@ -129,7 +129,7 @@ operators:
               values: ["gpu"]
 
   dns:
-    enabled: false  # Enabled for testing - requires Azure/AWS/GCP DNS credentials for full functionality # Some basic testing has been done to check operator pods are available when using the helm charts.
+    enabled: true  # Disabled by default - requires Azure/AWS/GCP DNS credentials
     replicas: 1
     resources:
       requests:

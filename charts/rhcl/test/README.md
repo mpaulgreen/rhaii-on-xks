@@ -7,7 +7,8 @@ Automated end-to-end test for RHCL policy enforcement.
 ## Quick Start
 
 ```bash
-cd ../test
+# From repository root:
+cd charts/rhcl/test
 
 # Run test with automatic cleanup (recommended)
 ./deploy-test.sh
