@@ -58,7 +58,7 @@ spec:
         - name: EXTENSIONS_DIR
           value: /extensions
         - name: RELATED_IMAGE_WASMSHIM
-          value: {{ .Values.images.registry }}/{{ .Values.images.components.wasmshim.repository }}@{{ .Values.images.components.wasmshim.digest }}
+          value: {{ .Values.images.components.wasmshim.registry | default .Values.images.registry }}/{{ .Values.images.components.wasmshim.repository }}@{{ .Values.images.components.wasmshim.digest }}
         - name: OPERATOR_NAMESPACE
           valueFrom:
             fieldRef:

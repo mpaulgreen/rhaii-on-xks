@@ -38,3 +38,7 @@ venv/
 *.zip
 dist/
 build/
+
+# Azure AD tokens (test credentials)
+.azure-ad-token
+*.azure-ad-token

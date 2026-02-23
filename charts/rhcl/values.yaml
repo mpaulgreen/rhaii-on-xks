@@ -129,7 +129,7 @@ operators:
               values: ["gpu"]
 
   dns:
-    enabled: true  # Disabled by default - requires Azure/AWS/GCP DNS credentials
+    enabled: false  # Disabled by default - requires Azure/AWS/GCP DNS credentials
     replicas: 1
     resources:
       requests:
