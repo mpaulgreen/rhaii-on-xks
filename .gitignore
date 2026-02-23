@@ -39,6 +39,9 @@ venv/
 dist/
 build/
 
+# Documentation build
+site/
+
 # Azure AD tokens (test credentials)
 .azure-ad-token
 *.azure-ad-token
