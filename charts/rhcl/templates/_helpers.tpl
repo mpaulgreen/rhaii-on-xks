@@ -64,26 +64,6 @@ Construct the full image reference with registry, repository, and digest
 {{- end }}
 
 {{/*
-Construct operator image reference
-Usage: {{ include "rhcl.operatorImage" (dict "operator" .Values.images.operators.kuadrant "root" .) }}
-*/}}
-{{- define "rhcl.operatorImage" -}}
-{{- $operator := .operator -}}
-{{- $root := .root -}}
-{{- include "rhcl.image" (dict "registry" ($operator.registry | default $root.Values.images.registry) "repository" $operator.repository "digest" $operator.digest "Values" $root.Values) }}
-{{- end }}
-
-{{/*
-Construct component image reference (handles registry override for wasmshim)
-Usage: {{ include "rhcl.componentImage" (dict "component" .Values.images.components.authorino "root" .) }}
-*/}}
-{{- define "rhcl.componentImage" -}}
-{{- $component := .component -}}
-{{- $root := .root -}}
-{{- include "rhcl.image" (dict "registry" ($component.registry | default $root.Values.images.registry) "repository" $component.repository "digest" $component.digest "Values" $root.Values) }}
-{{- end }}
-
-{{/*
 Return the appropriate apiVersion for RBAC
 */}}
 {{- define "rhcl.rbac.apiVersion" -}}
@@ -95,16 +75,4 @@ Return the appropriate apiVersion for Deployment
 */}}
 {{- define "rhcl.deployment.apiVersion" -}}
 apps/v1
-{{- end }}
-
-{{/*
-Validate prerequisites
-*/}}
-{{- define "rhcl.validatePrerequisites" -}}
-{{- if .Values.prerequisites.certManager.enabled }}
-  {{- /* TODO: Add cert-manager version check */ -}}
-{{- end }}
-{{- if .Values.prerequisites.gatewayAPI.enabled }}
-  {{- /* TODO: Add Gateway API version check */ -}}
-{{- end }}
 {{- end }}

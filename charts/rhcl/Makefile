@@ -8,7 +8,7 @@
 #     - Requires manual steps (presync, Kuadrant CR creation)
 #     - Suitable for development/testing
 
-.PHONY: help lint template template-debug dry-run install upgrade uninstall test validate status logs logs-all clean package diff apply destroy
+.PHONY: help check lint template template-debug dry-run install upgrade uninstall test validate status logs logs-all clean package diff apply destroy
 
 CHART_NAME := rhcl
 NAMESPACE := kuadrant-operators
@@ -19,6 +19,10 @@ help: ## Show this help message
 	@echo "RHCL Helm Chart - Make Targets"
 	@echo ""
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+
+check: ## Run pre-deployment verification checks
+	@echo "Running pre-deployment verification..."
+	@bash scripts/pre-deploy-check-aks.sh
 
 lint: ## Lint the Helm chart
 	@echo "Linting Helm chart..."

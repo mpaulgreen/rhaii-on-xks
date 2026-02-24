@@ -2,7 +2,7 @@
 
 # Platform configuration
 platform:
-  type: kubernetes  # Options: kubernetes, openshift
+  type: kubernetes  # Options: kubernetes, openshift  # for future compatibility wih Openshift
 
 # Namespaces
 namespaces:
@@ -63,7 +63,9 @@ images:
 # Optimized for AKS with GPU nodes
 operators:
   kuadrant:
-    enabled: true
+    # Note: Kuadrant operator is always deployed (required meta-operator)
+    # Unlike sub-operators (authorino, limitador, dns), this cannot be disabled
+    # as it manages the entire RHCL stack and creates CRs for sub-operators
     replicas: 1
     resources:
       requests:
@@ -76,6 +78,10 @@ operators:
     env: []
     # Pod security context (optional, defaults to seccompProfile: RuntimeDefault)
     podSecurityContext: {}
+    # Node selector (optional)
+    nodeSelector: {}
+    # Tolerations (optional)
+    tolerations: []
     # Avoid scheduling on GPU nodes (AKS-specific)
     affinity:
       nodeAffinity:
@@ -98,6 +104,8 @@ operators:
         memory: 512Mi
     env: []
     podSecurityContext: {}
+    nodeSelector: {}
+    tolerations: []
     affinity:
       nodeAffinity:
         requiredDuringSchedulingIgnoredDuringExecution:
@@ -119,6 +127,8 @@ operators:
         memory: 512Mi
     env: []
     podSecurityContext: {}
+    nodeSelector: {}
+    tolerations: []
     affinity:
       nodeAffinity:
         requiredDuringSchedulingIgnoredDuringExecution:
@@ -140,6 +150,8 @@ operators:
         memory: 256Mi
     env: []
     podSecurityContext: {}
+    nodeSelector: {}
+    tolerations: []
     affinity:
       nodeAffinity:
         requiredDuringSchedulingIgnoredDuringExecution:
@@ -149,74 +161,28 @@ operators:
               operator: NotIn
               values: ["gpu"]
 
-# RHCL instance configuration
+# RHCL instance configuration # Multi-tenacy, # Gitops separation, # Phase deployments.
 instance:
   kuadrant:
     enabled: true
     name: kuadrant
-    # Kuadrant CR spec
-    # The Kuadrant operator will create Authorino and Limitador instances based on this
-    spec: {}
 
 # RBAC configuration
+# When does RBAC is false
+# Use case: Enterprise requires security team to pre-create RBAC manually
+# Chart only deploys operators, security team manages RBAC separately
 rbac:
   create: true
-  # Create granular CRD-specific roles (admin/edit/view per CRD)
-  # Set to false to only create operator ClusterRoles
-  createGranularRoles: false
-
-  # List of CRDs for which to create granular roles
-  # Only used if createGranularRoles is true
-  crds:
-    # Kuadrant CRDs
-    - name: kuadrants.kuadrant.io
-    - name: authpolicies.kuadrant.io
-    - name: ratelimitpolicies.kuadrant.io
-    - name: dnspolicies.kuadrant.io
-    - name: tlspolicies.kuadrant.io
-    - name: tokenratelimitpolicies.kuadrant.io
-    - name: oidcpolicies.extensions.kuadrant.io
-    - name: planpolicies.extensions.kuadrant.io
-    - name: telemetrypolicies.extensions.kuadrant.io
-    # Authorino CRDs
-    - name: authconfigs.authorino.kuadrant.io
-    - name: authorinos.operator.authorino.kuadrant.io
-    # Limitador CRDs
-    - name: limitadors.limitador.kuadrant.io
-    # DNS CRDs
-    - name: dnsrecords.kuadrant.io
-    - name: dnshealthcheckprobes.kuadrant.io
 
 # Prerequisites validation
 prerequisites:
   # Validate cert-manager is installed
-  # Version must match cert-manager-operator chart (appVersion: 1.15.2)
   certManager:
     enabled: true
-    version: ">=1.15.2"
 
   # Validate Gateway API CRDs are installed
-  # Version must match sail-operator chart (gatewayAPI.version: v1.4.0)
   gatewayAPI:
     enabled: true
-    version: ">=1.4.0"
-
-# Optional: User-provided policies to create after Kuadrant is ready
-# These are examples - typically users will create policies separately
-policies:
-  enabled: false
-
-  # AuthPolicies to create
-  authPolicies: []
-
-  # RateLimitPolicies to create
-  rateLimitPolicies: []
-
-  # DNSPolicies to create
-  dnsPolicies: []
-
-  # TLSPolicies to create
-  tlsPolicies: []
 
 # Helmfile configuration (used by helmfile.yaml.gotmpl)
 # Uses podman auth from ~/.config/containers/auth.json
